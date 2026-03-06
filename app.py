@@ -4,11 +4,18 @@ from sarvamai import SarvamAI
 
 load_dotenv()
 
-Saravam_API_key = os.getenv("SARVAM_API_KEY")
+sarvam_api_key = os.getenv("SARVAM_API_KEY")
 
 client = SarvamAI(
-    api_subscription_key=Saravam_API_key,
+    api_subscription_key=sarvam_api_key,
 )
+
+def speech_to_text(audio):
+    response = client.speech_to_text.transcribe(
+        file=open("audio.wav", "rb"),
+        model="saaras:v3",
+        mode="transcribe"  # or "translate", "verbatim", "translit", "codemix"
+    )
 
 response = client.text.translate(
     input="Hi, My Name is Ayush.",
@@ -19,9 +26,6 @@ response = client.text.translate(
 
 print(response)
 
-response = client.speech_to_text.transcribe(
-    file=open("audio.wav", "rb"),
-    model="saaras:v3",
-    mode="transcribe"  # or "translate", "verbatim", "translit", "codemix"
-)
+filepath = "audio.wav"
+response = speech_to_text(filepath)
 print(response)
