@@ -13,6 +13,7 @@ load_dotenv(_project_root / ".env")
 
 
 # ── API Keys ────────────────────────────────────────────────────────
+OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
 SARVAM_API_KEY: str | None = os.getenv("SARVAM_API_KEY")  # reserved for Phase 2
 
@@ -40,9 +41,11 @@ DB_PATH = DATA_DIR / "echoes.db"
 
 
 # ── Validation ──────────────────────────────────────────────────────
-def validate_keys(require_gemini: bool = True) -> None:
+def validate_keys(require_openai: bool = False, require_gemini: bool = True) -> None:
     """Check that required API keys are present. Exit with a clear message if not."""
     missing = []
+    if require_openai and not OPENAI_API_KEY:
+        missing.append("OPENAI_API_KEY")
     if require_gemini and not GEMINI_API_KEY:
         missing.append("GEMINI_API_KEY")
 

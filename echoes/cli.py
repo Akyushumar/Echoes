@@ -104,7 +104,38 @@ def add(
     console.print(_mood_styled(emotion["mood_tag"]), end="")
     console.print(f" (confidence: {emotion['confidence']:.0%})")
     console.print(f"   Summary: {emotion['summary']}")
-    console.print(f"   Language: {stt_result['language']}")
+    console.print(f"   Language: {stt_result['language']} ({stt_result['provider']})")
+
+
+@app.command()
+def transcribe(
+    file: Path = typer.Argument(..., help="Path to an audio file to transcribe."),
+    language: Optional[str] = typer.Option(
+        None, "--lang", "-l", help="ISO-639-1 language hint (e.g. 'en', 'hi')."
+    ),
+    model: str = typer.Option(
+        "base", "--model", "-m", help="Whisper model size for local fallback (tiny, base, etc.)."
+    ),
+):
+    """Only transcribe an audio file (no analysis or saving)."""
+    if not file.exists():
+        console.print(f"[red][X] File not found: {file}[/red]")
+        raise typer.Exit(1)
+
+    with console.status(f"[bold cyan]Transcribing {file.name}...[/bold cyan]"):
+        try:
+            stt_result = transcribe_audio(file, language=language, model_name=model)
+        except Exception as e:
+            console.print(f"[red][X] Transcription failed: {e}[/red]")
+            raise typer.Exit(1)
+
+    console.print()
+    console.print(Panel(
+        stt_result["transcript"], 
+        title=f"Transcript ({stt_result['language']} | {stt_result['provider']})", 
+        border_style="cyan"
+    ))
+    console.print(f"Duration: {stt_result['duration']}s")
 
 
 @app.command(name="list")
