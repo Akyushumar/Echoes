@@ -125,13 +125,26 @@ def add(
     )
 
     entry_id = save_entry(entry)
+
+    # Save audio file and update entry with path
+    from echoes.audio_utils import save_audio_file
+    audio_path = save_audio_file(file, entry_id)
+    # Update the DB record with the audio path
+    from echoes.storage import _get_connection
+    conn = _get_connection()
+    conn.execute("UPDATE entries SET audio_path = ? WHERE id = ?", (audio_path, entry_id))
+    conn.commit()
+    conn.close()
+
     console.print()
     console.print(f"[bold green][OK] Entry #{entry_id} saved![/bold green]")
     console.print(f"   Mood: ", end="")
     console.print(_mood_styled(emotion["mood_tag"]), end="")
     console.print(f" (confidence: {emotion['confidence']:.0%})")
     console.print(f"   Summary: {emotion['summary']}")
-    console.print(f"   Language: {stt_result['language']} ({stt_result['provider']})")
+    chunks = stt_result.get("chunks", 1)
+    console.print(f"   Language: {stt_result['language']} ({stt_result['provider']}, {chunks} chunk{'s' if chunks > 1 else ''})")
+    console.print(f"   Audio: {audio_path}")
 
 
 @app.command()

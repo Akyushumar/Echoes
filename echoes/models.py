@@ -43,3 +43,5 @@ class JournalEntry:
     tags: str = ""                  # comma-separated user tags
     schema_version: int = 1
     audio_duration: Optional[float] = None
+    audio_path: Optional[str] = None  # relative path to saved audio file
+

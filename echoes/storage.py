@@ -22,8 +22,13 @@ CREATE TABLE IF NOT EXISTS entries (
     summary         TEXT    DEFAULT '',
     tags            TEXT    DEFAULT '',
     schema_version  INTEGER DEFAULT 1,
-    audio_duration  REAL
+    audio_duration  REAL,
+    audio_path      TEXT    DEFAULT ''
 );
+"""
+
+_MIGRATE_ADD_AUDIO_PATH = """
+ALTER TABLE entries ADD COLUMN audio_path TEXT DEFAULT '';
 """
 
 
@@ -35,6 +40,12 @@ def _get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute(_CREATE_TABLE)
     conn.commit()
+    # Migrate: add audio_path if missing (for existing databases)
+    try:
+        conn.execute(_MIGRATE_ADD_AUDIO_PATH)
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     return conn
 
 
@@ -47,8 +58,8 @@ def save_entry(entry: JournalEntry, db_path: Optional[Path] = None) -> int:
             """
             INSERT INTO entries
                 (timestamp, transcript, language, mood_tag, confidence,
-                 summary, tags, schema_version, audio_duration)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 summary, tags, schema_version, audio_duration, audio_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entry.timestamp,
@@ -60,6 +71,7 @@ def save_entry(entry: JournalEntry, db_path: Optional[Path] = None) -> int:
                 entry.tags,
                 entry.schema_version,
                 entry.audio_duration,
+                entry.audio_path or "",
             ),
         )
         conn.commit()
@@ -182,4 +194,5 @@ def _row_to_entry(row: sqlite3.Row) -> JournalEntry:
         tags=row["tags"],
         schema_version=row["schema_version"],
         audio_duration=row["audio_duration"],
+        audio_path=row["audio_path"] if "audio_path" in row.keys() else "",
     )
