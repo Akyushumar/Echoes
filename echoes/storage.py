@@ -116,6 +116,59 @@ def get_entry_count(db_path: Optional[Path] = None) -> int:
         conn.close()
 
 
+def search_entries(
+    keyword: Optional[str] = None,
+    mood_tag: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 50,
+    db_path: Optional[Path] = None,
+) -> list[JournalEntry]:
+    """Search entries by keyword, mood, and/or date range."""
+    conn = _get_connection(db_path)
+    try:
+        clauses = []
+        params: list = []
+
+        if keyword:
+            clauses.append("(transcript LIKE ? OR summary LIKE ? OR tags LIKE ?)")
+            kw = f"%{keyword}%"
+            params.extend([kw, kw, kw])
+
+        if mood_tag:
+            clauses.append("mood_tag = ?")
+            params.append(mood_tag.lower())
+
+        if date_from:
+            clauses.append("timestamp >= ?")
+            params.append(date_from)
+
+        if date_to:
+            clauses.append("timestamp <= ?")
+            params.append(date_to)
+
+        where = " AND ".join(clauses) if clauses else "1=1"
+        query = f"SELECT * FROM entries WHERE {where} ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+        return [_row_to_entry(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_all_entries(db_path: Optional[Path] = None) -> list[JournalEntry]:
+    """Fetch all entries (for export). Oldest first."""
+    conn = _get_connection(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT * FROM entries ORDER BY timestamp ASC"
+        ).fetchall()
+        return [_row_to_entry(r) for r in rows]
+    finally:
+        conn.close()
+
+
 # ── Helpers ─────────────────────────────────────────────────────────
 def _row_to_entry(row: sqlite3.Row) -> JournalEntry:
     return JournalEntry(
