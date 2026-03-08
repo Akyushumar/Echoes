@@ -1,0 +1,11 @@
+# Core dependencies
+openai-whisper              # Local Whisper STT (no API key needed)
+google-genai>=1.0.0         # Gemini API for emotion analysis
+python-dotenv>=1.0.0    # Environment variable loading
+typer[all]>=0.9.0       # CLI framework
+pydub>=0.25.0           # Audio format conversion
+rich>=13.0.0            # Pretty terminal output
+
+# Phase 2 (uncomment when needed)
+# sounddevice>=0.4.6    # Live mic recording
+# scipy>=1.11.0         # WAV file writing for sounddevice

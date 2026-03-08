@@ -2,3 +2,6 @@ myenv
 .env
 base.txt
 assessment.txt
+data/
+__pycache__/
+*.pyc
