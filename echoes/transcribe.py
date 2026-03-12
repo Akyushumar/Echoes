@@ -41,7 +41,7 @@ def _transcribe_sarvam(wav_path: Path, language: Optional[str] = None) -> dict:
         response = client.speech_to_text.transcribe(
             file=f,
             model="saaras:v3",
-            mode="transcribe",
+            mode="translate",
         )
 
     transcript = getattr(response, "transcript", "") or ""
