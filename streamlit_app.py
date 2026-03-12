@@ -7,6 +7,21 @@ from pathlib import Path
 import streamlit as st
 import plotly.graph_objects as go
 
+# --- PATCH FOR STREAMLIT CLOUD (PYTHON 3.13+) ---
+# Python 3.13 removed the built-in `audioop` module which `pydub` relies on.
+# `pyaudioop` fails to compile on Streamlit Cloud's Python 3.14 environment.
+# We mock it here so the app doesn't crash on boot.
+import sys
+if "audioop" not in sys.modules:
+    import types
+    mock_audioop = types.ModuleType("audioop")
+    # Mock the functions pydub tries to use on import
+    mock_audioop.error = Exception
+    mock_audioop.max = lambda *args: 0
+    mock_audioop.findmax = lambda *args: 0
+    sys.modules["audioop"] = mock_audioop
+# ------------------------------------------------
+
 from echoes.config import GEMINI_API_KEY, SARVAM_API_KEY, OPENAI_API_KEY, MOOD_TAGS
 from echoes.transcribe import transcribe_audio
 from echoes.analyse import analyse_emotion
