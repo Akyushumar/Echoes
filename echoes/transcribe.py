@@ -12,29 +12,27 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import whisper
-from openai import OpenAI
-from sarvamai import SarvamAI
-
 from echoes.config import OPENAI_API_KEY, SARVAM_API_KEY
 from echoes.audio_utils import ensure_wav, get_audio_duration, speedup_audio, chunk_audio
 
 logger = logging.getLogger(__name__)
 
 # Cache the local model so it's only loaded once per process
-_model_cache: dict[str, whisper.Whisper] = {}
+_model_cache: dict = {}
 
 
-def _get_local_model(model_name: str = "base") -> whisper.Whisper:
+def _get_local_model(model_name: str = "base") -> "whisper.Whisper":
     """Load a local Whisper model, caching it for reuse."""
+    import whisper as _whisper
     if model_name not in _model_cache:
-        _model_cache[model_name] = whisper.load_model(model_name)
+        _model_cache[model_name] = _whisper.load_model(model_name)
     return _model_cache[model_name]
 
 
 # ── Provider 1: Sarvam AI ──────────────────────────────────────────
 def _transcribe_sarvam(wav_path: Path, language: Optional[str] = None) -> dict:
     """Transcribe using Sarvam AI (best for Indic languages)."""
+    from sarvamai import SarvamAI
     client = SarvamAI(api_subscription_key=SARVAM_API_KEY)
 
     with open(wav_path, "rb") as f:
@@ -57,6 +55,7 @@ def _transcribe_sarvam(wav_path: Path, language: Optional[str] = None) -> dict:
 # ── Provider 2: OpenAI Whisper API ─────────────────────────────────
 def _transcribe_openai(wav_path: Path, language: Optional[str] = None) -> dict:
     """Transcribe using OpenAI Whisper API."""
+    from openai import OpenAI
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     with open(wav_path, "rb") as audio_file:

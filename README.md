@@ -12,11 +12,12 @@ Speak freely — in any language — and get back a clean transcript, an emotion
 |---|---|
 | **Triple STT Pipeline** | Sarvam AI (Indic) → OpenAI Whisper API → Local Whisper — automatic fallback |
 | **Audio Preprocessing** | 1.25x speedup + 29.99s chunking to maximise transcription quality |
-| **Emotion Analysis** | Gemini 2.0 Flash tags mood from a fixed 10-mood taxonomy |
+| **Triple Emotion Pipeline** | Gemini (retry) → Sarvam Chat → Local keyword classifier — never hard-fails |
 | **Audio Storage** | Voice notes saved to `data/audio/` with DB references |
 | **SQLite Journal** | All entries stored locally with full CRUD + search |
 | **Markdown Export** | Export your journal to `.md` for sharing or backup |
-| **Live Mic Recording** | Record directly from your microphone |
+| **Live Mic Recording** | Record directly from microphone (CLI) or browser (web UI) |
+| **Streamlit Web UI** | 4-page web app: New Entry, Journal, Mood Timeline, Search |
 | **Rich CLI** | Beautiful terminal output with colours and tables |
 
 ---
@@ -116,17 +117,21 @@ python -m echoes export --output my_journal.md --days 30
 ## Architecture
 
 ```
-echoes/
-├── __init__.py        # Package version
-├── __main__.py        # python -m echoes entry point
-├── config.py          # API keys, mood taxonomy, paths
-├── models.py          # MoodTag enum + JournalEntry dataclass
-├── storage.py         # SQLite CRUD + search + export
-├── audio_utils.py     # WAV conversion, 1.25x speedup, 29.99s chunking
-├── transcribe.py      # Triple STT: Sarvam → OpenAI → Local Whisper
-├── analyse.py         # Gemini 2.0 Flash emotion analysis
-├── recorder.py        # Live mic recording (sounddevice)
-└── cli.py             # Typer CLI with Rich output
+Echoes/
+├── streamlit_app.py   # Web UI (New Entry, Journal, Mood Timeline, Search)
+├── .streamlit/
+│   └── config.toml    # Dark theme + purple accent
+└── echoes/
+    ├── __init__.py        # Package version
+    ├── __main__.py        # python -m echoes entry point
+    ├── config.py          # API keys, mood taxonomy, paths
+    ├── models.py          # MoodTag enum + JournalEntry dataclass
+    ├── storage.py         # SQLite CRUD + search + export
+    ├── audio_utils.py     # WAV conversion, 1.25x speedup, 29.99s chunking
+    ├── transcribe.py      # Triple STT: Sarvam → OpenAI → Local Whisper
+    ├── analyse.py         # Triple emotion: Gemini → Sarvam → Local keywords
+    ├── recorder.py        # Live mic recording (sounddevice)
+    └── cli.py             # Typer CLI with Rich output
 ```
 
 ### How It Works
@@ -154,7 +159,10 @@ Audio File ──→ Normalise to WAV
           Stitch Transcripts
                     │
                     ▼
-        Gemini Emotion Analysis
+    ┌─ Gemini 2.0 Flash (retry×3) ──┐
+    │  └─ Sarvam Chat (fallback)    │
+    │     └─ Local Keywords ────────│
+    └────────────────────────────────┘
                     │
                     ▼
           Save to SQLite + Audio
@@ -188,11 +196,22 @@ Echoes uses a fixed 10-mood taxonomy for consistent emotion tracking:
 - `echoes search` — keyword, mood, and date filtering
 - `echoes export` — journal to Markdown
 
-### Phase 3 — Streamlit UI (Planned)
-- Web interface wrapping the CLI library
-- Audio upload + browser mic recording
-- Interactive mood timeline with Plotly
-- Deploy to Streamlit Cloud
+### Phase 3 — Streamlit UI ✅
+- **4-page web app**: New Entry, Journal, Mood Timeline, Search
+- Audio upload (`st.file_uploader`) + browser mic recording (`st.audio_input`)
+- Interactive Plotly charts: mood distribution bar + mood-over-time scatter
+- Audio playback for stored voice notes
+- Stat cards: total entries, top mood, total audio recorded
+- Dark theme with mood-coloured entry badges
+- Triple emotion fallback: Gemini → Sarvam Chat → Local keyword classifier
+
+### Run the Web UI
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Opens at **http://localhost:8501**
 
 ---
 
@@ -203,8 +222,11 @@ Echoes uses a fixed 10-mood taxonomy for consistent emotion tracking:
 | STT (Primary) | Sarvam AI (`saaras:v3`) |
 | STT (Fallback 1) | OpenAI Whisper API |
 | STT (Fallback 2) | Local Whisper (`openai-whisper`) |
-| Emotion Analysis | Google Gemini 2.0 Flash |
+| Emotion (Primary) | Google Gemini 2.0 Flash (3 retries + backoff) |
+| Emotion (Fallback 1) | Sarvam Chat (`sarvam-m`) |
+| Emotion (Fallback 2) | Local keyword classifier (English + Hinglish) |
 | Database | SQLite3 |
+| Web UI | Streamlit + Plotly |
 | CLI | Typer + Rich |
 | Audio Processing | pydub + ffmpeg |
 | Mic Recording | sounddevice + scipy |
