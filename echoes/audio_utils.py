@@ -1,20 +1,16 @@
-"""Audio format utilities — normalise, speed up, and chunk audio for STT engines."""
+"""Audio format utilities — normalise, speed up, and chunk audio for STT engines.
+Uses ffmpeg via subprocess to bypass Python's audioop dependencies missing in 3.13+.
+"""
 
 from __future__ import annotations
 
 import shutil
 import tempfile
-import warnings
+import subprocess
 from pathlib import Path
 
-# Suppress pydub's ffmpeg warning (WAV works without ffmpeg, and we'll
-# raise a clear error ourselves if conversion actually fails).
-warnings.filterwarnings("ignore", message=".*ffmpeg.*", category=RuntimeWarning)
 
-# Pydub AudioSegment is imported lazily inside functions that need it
-# to avoid blowing up on Python 3.13+ where `audioop` is removed.
-
-# Formats that pydub can handle (ffmpeg must be installed for non-wav)
+# Formats that ffmpeg can handle
 SUPPORTED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".ogg", ".webm", ".flac", ".aac"}
 
 # ── Audio dir for storing voice notes ──────────────────────────────
@@ -29,7 +25,6 @@ def ensure_wav(filepath: str | Path) -> Path:
     If the file is already a conforming WAV, return it as-is.
     Otherwise write a temp WAV and return the temp path.
     """
-    from pydub import AudioSegment
     filepath = Path(filepath)
 
     if not filepath.exists():
@@ -42,29 +37,31 @@ def ensure_wav(filepath: str | Path) -> Path:
             f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
         )
 
-    # Load audio via pydub
-    audio = AudioSegment.from_file(str(filepath))
-
-    # Normalise: mono, 16 kHz, 16-bit
-    audio = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)
-
-    # Write to temp file (caller is responsible for cleanup if needed)
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp_path = Path(tmp.name)
-    tmp.close()  # Close handle so other processes can write on Windows
+    tmp.close()
 
-    audio.export(str(tmp_path), format="wav")
+    # Normalise: mono, 16 kHz, 16-bit
+    cmd = [
+        "ffmpeg", "-y", "-i", str(filepath),
+        "-ar", "16000", "-ac", "1", "-sample_fmt", "s16",
+        str(tmp_path)
+    ]
+    
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     return tmp_path
 
 
 def get_audio_duration(filepath: str | Path) -> float:
     """Return duration in seconds."""
-    # This function also uses AudioSegment, but the instruction only specified the other three.
-    # I will not modify this function as per the strict instruction.
-    # from pydub import AudioSegment # If this were to be added
-    from pydub import AudioSegment # Adding it here for completeness, though not explicitly asked for this one.
-    audio = AudioSegment.from_file(str(filepath))
-    return len(audio) / 1000.0
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(filepath)
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True)
+    return float(result.stdout.strip())
 
 
 def save_audio_file(filepath: str | Path, entry_id: int) -> str:
@@ -84,27 +81,19 @@ def speedup_audio(filepath: str | Path, factor: float = 1.25) -> Path:
     """
     Speed up audio by the given factor without changing pitch.
 
-    Uses pydub's frame rate manipulation for a simple speedup.
-    This effectively compresses X minutes into X/factor minutes,
-    letting Sarvam's 30s window capture more speech.
-
+    Uses ffmpeg's atempo filter.
     Returns path to the sped-up WAV file.
     """
-    from pydub import AudioSegment
-    audio = AudioSegment.from_file(str(filepath))
-
-    # Speed up by increasing frame rate, then setting back to original
-    # This makes the audio play faster (higher pitch, but STT handles it)
-    original_rate = audio.frame_rate
-    sped_up = audio._spawn(audio.raw_data, overrides={
-        "frame_rate": int(original_rate * factor)
-    }).set_frame_rate(original_rate)
-
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp_path = Path(tmp.name)
     tmp.close()
 
-    sped_up.export(str(tmp_path), format="wav")
+    cmd = [
+        "ffmpeg", "-y", "-i", str(filepath),
+        "-filter:a", f"atempo={factor}",
+        str(tmp_path)
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     return tmp_path
 
 
@@ -116,21 +105,25 @@ def chunk_audio(filepath: str | Path, chunk_ms: int = 29_990) -> list[Path]:
 
     Returns a list of paths to the chunk WAV files, in order.
     """
-    from pydub import AudioSegment
-    audio = AudioSegment.from_file(str(filepath))
-    duration_ms = len(audio)
+    duration = get_audio_duration(filepath)
+    chunk_sec = chunk_ms / 1000.0
 
-    if duration_ms <= chunk_ms:
+    if duration <= chunk_sec:
         # No splitting needed
         return [Path(filepath)]
 
-    chunks: list[Path] = []
-    for i in range(0, duration_ms, chunk_ms):
-        segment = audio[i:i + chunk_ms]
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        tmp_path = Path(tmp.name)
-        tmp.close()
-        segment.export(str(tmp_path), format="wav")
-        chunks.append(tmp_path)
+    # We need a temp directory for the segments
+    tmp_dir = Path(tempfile.mkdtemp())
+    out_pattern = tmp_dir / "chunk_%03d.wav"
 
+    cmd = [
+        "ffmpeg", "-y", "-i", str(filepath),
+        "-f", "segment", "-segment_time", str(chunk_sec),
+        "-c", "copy",
+        str(out_pattern)
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+    # Gather generated chunks
+    chunks = sorted(list(tmp_dir.glob("chunk_*.wav")))
     return chunks
