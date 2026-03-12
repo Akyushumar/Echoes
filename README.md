@@ -127,7 +127,7 @@ Echoes/
     ├── config.py          # API keys, mood taxonomy, paths
     ├── models.py          # MoodTag enum + JournalEntry dataclass
     ├── storage.py         # SQLite CRUD + search + export
-    ├── audio_utils.py     # WAV conversion, 1.25x speedup, 29.99s chunking
+    ├── audio_utils.py     # Pure ffmpeg conversions, 1.25x speedup, 29.99s chunking
     ├── transcribe.py      # Triple STT: Sarvam → OpenAI → Local Whisper
     ├── analyse.py         # Triple emotion: Gemini → Sarvam → Local keywords
     ├── recorder.py        # Live mic recording (sounddevice)
@@ -204,6 +204,7 @@ Echoes uses a fixed 10-mood taxonomy for consistent emotion tracking:
 - Stat cards: total entries, top mood, total audio recorded
 - Dark theme with mood-coloured entry badges
 - Triple emotion fallback: Gemini → Sarvam Chat → Local keyword classifier
+- **Cloud Ready**: Pure ffmpeg audio pipeline to bypass Python 3.13+ `audioop` constraints on Streamlit Cloud
 
 ### Run the Web UI
 
@@ -228,7 +229,7 @@ Opens at **http://localhost:8501**
 | Database | SQLite3 |
 | Web UI | Streamlit + Plotly |
 | CLI | Typer + Rich |
-| Audio Processing | pydub + ffmpeg |
+| Audio Processing | Pure ffmpeg (subprocess) |
 | Mic Recording | sounddevice + scipy |
 
 ---
