@@ -3,6 +3,7 @@ google-genai>=1.0.0         # Gemini API for emotion analysis
 python-dotenv>=1.0.0        # Environment variable loading
 typer[all]>=0.9.0           # CLI framework
 pydub>=0.25.0               # Audio format conversion
+pyaudioop                   # Backport of removed audioop (required for pydub on Python 3.13+)
 rich>=13.0.0                # Pretty terminal output
 
 # STT providers
