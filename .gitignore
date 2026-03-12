@@ -8,3 +8,5 @@ __pycache__/
 
 # Local app script
 app.py
+benchmark_1.py
+benchmark_2.py
