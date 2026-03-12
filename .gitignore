@@ -4,4 +4,7 @@ base.txt
 assessment.txt
 data/
 __pycache__/
-*.pyc
+*.pyc/
+
+# Local app script
+app.py
