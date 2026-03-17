@@ -251,7 +251,8 @@ elif page == "📓 Journal":
         st.info("No entries yet. Create one from the **✨ New Entry** page!")
         st.stop()
 
-    count = st.slider("Entries to show", 5, min(total, 50), min(total, 10))
+    default = min(total, 10)
+    count = st.slider("Entries to show", 1, min(total, 5), default)
     entries = get_entries(limit=count)
 
     # Stats row
